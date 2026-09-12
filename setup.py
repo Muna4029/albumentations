@@ -1,5 +1,5 @@
 import re
-from pkg_resources import DistributionNotFound, get_distribution
+from importlib.metadata import PackageNotFoundError, distribution as get_distribution
 from setuptools import setup, find_packages
 
 INSTALL_REQUIRES = [
@@ -26,7 +26,7 @@ def is_installed(package_name: str) -> bool:
     try:
         get_distribution(package_name)
         return True
-    except DistributionNotFound:
+    except PackageNotFoundError:
         return False
 
 def choose_opencv_requirement():
