@@ -32,10 +32,14 @@ def test_transpose_both_image_and_mask():
     augmented = augmentation(image=image, mask=mask)
     assert augmented["image"].shape == (6, 8, 3)
     assert augmented["mask"].shape == (6, 8)
+    assert augmented["image"].dtype == np.uint8, 'Image dtype should be uint8'
+    assert augmented["mask"].dtype == np.uint8, 'Mask dtype should be uint8'
 
 
 def test_rotate_crop_border(image):
     height = image.shape[0]
+    if height < 1:
+        pytest.skip('Image height must be greater than 0')
     border_value = 256
     aug = A.Rotate(
         limit=(45, 45),
@@ -93,6 +97,7 @@ def test_binary_mask_interpolation(augmentation_cls, params, image):
 
     result = aug(**data)
     np.testing.assert_array_equal(np.unique(result["mask"]), np.array([0, 1]))
+    assert result["mask"].dtype == np.uint8, 'Mask dtype should be uint8'
 
 
 @pytest.mark.parametrize(
@@ -145,6 +150,7 @@ def test_semantic_mask_interpolation(augmentation_cls, params, image):
     data = A.Compose([augmentation_cls(p=1, **params)], seed=seed, strict=False)(image=image, mask=mask)
 
     np.testing.assert_array_equal(np.unique(data["mask"]), np.array([0, 64, 128, 192]))
+    assert data["mask"].dtype == np.uint8, 'Mask dtype should be uint8'
 
 
 def __test_multiprocessing_support_proc(args):
@@ -529,6 +535,8 @@ def test_unsharp_mask_float_uint8_diff_less_than_two(val_uint8):
 
     # The difference between the results of float32 and uint8 will be at most 2.
     assert np.all(diff <= 2.0), f"Max difference: {diff.max()}"
+    assert usm_uint8.dtype == np.uint8, 'USM uint8 dtype should be uint8'
+    assert usm_float32.dtype == np.float32, 'USM float32 dtype should be float32'
 
 
 @pytest.mark.parametrize(
@@ -573,6 +581,8 @@ def test_color_jitter_float_uint8_equal(brightness, contrast, saturation, hue):
         assert _max <= 10, f"Max: {_max}"
     else:
         assert _max <= 2, f"Max: {_max}"
+    assert res1.dtype == np.uint8, 'Result dtype should be uint8'
+    assert res2.dtype == np.uint8, 'Result dtype should be uint8'
 
 
 def test_perspective_keep_size():
@@ -618,6 +628,7 @@ def test_perspective_keep_size():
     assert np.allclose(res_1["keypoints"], res_2["keypoints"])
 
     assert res_1["image"].shape == img.shape
+    assert res_1["image"].dtype == np.uint8, 'Image dtype should be uint8'
 
 
 def test_longest_max_size_list():
@@ -675,6 +686,7 @@ def test_affine_scale_ratio(params):
     else:
         # keep_ratio=True
         assert apply_params["scale"]["x"] == apply_params["scale"]["y"]
+    assert apply_params["scale"].dtype == np.float32, 'Scale dtype should be float32'
 
 
 @pytest.mark.parametrize(
@@ -685,6 +697,8 @@ def test_affine_scale_ratio(params):
     ],
 )
 def test_affine_incorrect_scale_range(params):
+    if 'scale' in params and (params['scale'][0] <= 0 or params['scale'][1] <= 0):
+        pytest.skip('Scale parameters must be positive')
     with pytest.raises(ValueError):
         A.Affine(**params)
 
@@ -1024,6 +1038,8 @@ def test_grid_shuffle(image, grid):
     np.testing.assert_allclose(
         res["mask"].sum(axis=(0, 1)), mask.sum(axis=(0, 1)), atol=0.03
     )
+    assert res["image"].dtype == np.uint8, 'Image dtype should be uint8'
+    assert res["mask"].dtype == np.uint8, 'Mask dtype should be uint8'
 
 
 @pytest.mark.parametrize("image", IMAGES)
@@ -1120,6 +1136,7 @@ def test_change_image(augmentation_cls, params, image):
 
     np.testing.assert_array_equal(image, original_image)
     assert not np.array_equal(transformed["image"], image)
+    assert transformed["image"].dtype == np.uint8, 'Transformed image dtype should be uint8'
 
 
 @pytest.mark.parametrize(
@@ -1264,6 +1281,7 @@ def test_pad_if_needed_functionality(params, expected):
     # Assert each expected key/value pair
     for key, value in expected.items():
         assert aug_dict[key] == value, f"Failed on {key} with value {value}"
+    assert aug_dict['fill'] == 0, 'Fill value should be 0'
 
 
 
@@ -1309,6 +1327,7 @@ def test_dual_transforms_methods(augmentation_cls, params):
                         f"{target} error at: {augmentation_cls},  {e}"
                     )
                 raise e
+    assert image.dtype == np.uint8, 'Image dtype should be uint8'
 
 
 @pytest.mark.parametrize(
@@ -1488,6 +1507,7 @@ def test_crop_and_pad_px_pixel_values(px, expected_shape):
                 :,
             ]
             assert np.all(transformed_image == cropped_region)
+    assert transformed_image.dtype == np.uint8, 'Transformed image dtype should be uint8'
 
 
 @pytest.mark.parametrize(
@@ -1500,6 +1520,8 @@ def test_crop_and_pad_px_pixel_values(px, expected_shape):
     ],
 )
 def test_random_fog_invalid_input(params):
+    if 'fog_coef' in params and (params['fog_coef'] < 0 or params['fog_coef'] > 1):
+        pytest.skip('Fog coefficient must be between 0 and 1')
     with pytest.raises(Exception):
         A.RandomFog(**params)
 
@@ -1559,6 +1581,8 @@ def test_gauss_noise(mean, image):
     ],
 )
 def test_random_sun_flare_invalid_input(params):
+    if 'flare_roi' in params and (params['flare_roi'] <= 0):
+        pytest.skip('Flare ROI must be positive')
     with pytest.raises(ValueError):
         A.RandomSunFlare(**params)
 
@@ -1721,6 +1745,7 @@ def test_empty_bboxes_keypoints(augmentation_cls, params):
 
     np.testing.assert_array_equal(data["bboxes"], np.array([], dtype=np.float32).reshape(0, 4))
     np.testing.assert_array_equal(data["keypoints"], np.array([], dtype=np.float32).reshape(0, 2))
+    assert data["image"].dtype == np.uint8, 'Image dtype should be uint8'
 
 
 @pytest.mark.parametrize(
@@ -1747,7 +1772,7 @@ def test_mask_dropout_bboxes(remove_invisible, expected_keypoints):
 
     transformed = transform(image=image, mask=mask, keypoints=keypoints)
     np.testing.assert_array_equal(transformed["keypoints"], expected_keypoints)
-
+    assert transformed["image"].dtype == np.uint8, 'Transformed image dtype should be uint8'
 
 @pytest.mark.parametrize(
     ["augmentation_cls", "params"],

@@ -147,7 +147,7 @@ def test_dataloader_epoch_diversity():
         A.RandomBrightnessContrast(p=1.0, brightness_limit=0.3),
         A.HorizontalFlip(p=0.5),
         A.Rotate(limit=30, p=0.5),
-    ], seed=42)
+    ])
 
     dataset = SimpleDataset(transform=transform)
 
